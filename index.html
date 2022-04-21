@@ -1,0 +1,173 @@
+<head>
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  </head>
+  
+  <body>
+    <div id="myDiv"><!-- Plotly chart will be drawn inside this DIV --></div>
+    <script>
+      Plotly.d3.csv('https://raw.githubusercontent.com/MCarron/POLYTICS/main/vote_SF.csv?token=GHSAT0AAAAAABTZS5NJ6S25WI5IO236LNAIYTBRKWQ', function (err, data) {
+  // Create a lookup table to sort and regroup the columns of data,
+  // first by An_debut, then by Canton:
+  var lookup = {};
+  function getData(An_debut, Canton) {
+    var byAn_debut, trace;
+    if (!(byAn_debut = lookup[An_debut])) {;
+      byAn_debut = lookup[An_debut] = {};
+    }
+   // If a container for this An_debut + Canton doesn't exist yet,
+   // then create one:
+    if (!(trace = byAn_debut[Canton])) {
+      trace = byAn_debut[Canton] = {
+        x: [],
+        y: [],
+        id: [],
+        text: [],
+        marker: {size: []}
+      };
+    }
+    return trace;
+  }
+
+  // Go through each row, get the right trace, and append the data:
+  for (var i = 0; i < data.length; i++) {
+    var datum = data[i];
+    var trace = getData(datum.An_debut, datum.Canton);
+    trace.text.push(datum.Commune);
+    trace.id.push(datum.Commune);
+    trace.x.push(datum.F_1);
+    trace.y.push(datum.F_2);
+    trace.marker.size.push(datum.Poids);
+  }
+
+  // Get the group names:
+  var year = Object.keys(lookup);
+  // In this case, every An_debut includes every Canton, so we
+  // can just infer the continents from the *first* An_debut:
+  var firstAn_debut = lookup[year[0]];
+  var continents = Object.keys(firstAn_debut);
+
+  // Create the main traces, one for each Canton:
+  var traces = [];
+  for (i = 0; i < continents.length; i++) {
+    var data = firstAn_debut[continents[i]];
+   // One small note. We're creating a single trace here, to which
+   // the frames will pass data for the different year. It's
+   // subtle, but to avoid data reference problems, we'll slice 
+   // the arrays to ensure we never write any new data into our
+   // lookup table:
+    traces.push({
+      name: continents[i],
+      x: data.x.slice(),
+      y: data.y.slice(),
+      id: data.id.slice(),
+      text: data.text.slice(),
+      mode: 'markers',
+      marker: {
+        size: data.marker.size.slice(),
+        sizemode: 'area',
+        sizeref: 200000
+      }
+    });
+  }
+
+  // Create a frame for each An_debut. Frames are effectively just
+  // traces, except they don't need to contain the *full* trace
+  // definition (for example, appearance). The frames just need
+  // the parts the traces that change (here, the data).
+  var frames = [];
+  for (i = 0; i < year.length; i++) {
+    frames.push({
+      name: year[i],
+      data: continents.map(function (Canton) {
+        return getData(year[i], Canton);
+      })
+    })
+  }
+  
+  // Now create slider steps, one for each frame. The slider
+  // executes a plotly.js API command (here, Plotly.animate).
+  // In this example, we'll animate to one of the named frames
+  // created in the above loop.
+  var sliderSteps = [];
+  for (i = 0; i < year.length; i++) {
+    sliderSteps.push({
+      method: 'animate',
+      label: year[i],
+      args: [[year[i]], {
+        mode: 'immediate',
+        transition: {duration: 300},
+        frame: {duration: 300, redraw: false},
+      }]
+    });
+  }
+  
+  var layout = {
+    xaxis: {
+      title: 'Life Expectancy',
+      range: [30, 85]
+    },
+    yaxis: {
+      title: 'GDP per Capita',
+      type: 'log'
+    },
+    hovermode: 'closest',
+   // We'll use updatemenus (whose functionality includes menus as
+   // well as buttons) to create a play button and a pause button.
+   // The play button works by passing `null`, which indicates that
+   // Plotly should animate all frames. The pause button works by
+   // passing `[null]`, which indicates we'd like to interrupt any
+   // currently running animations with a new list of frames. Here
+   // The new list of frames is empty, so it halts the animation.
+    updatemenus: [{
+      x: 0,
+      y: 0,
+      yanchor: 'top',
+      xanchor: 'left',
+      showactive: false,
+      direction: 'left',
+      type: 'buttons',
+      pad: {t: 87, r: 10},
+      buttons: [{
+        method: 'animate',
+        args: [null, {
+          mode: 'immediate',
+          fromcurrent: true,
+          transition: {duration: 300},
+          frame: {duration: 500, redraw: false}
+        }],
+        label: 'Play'
+      }, {
+        method: 'animate',
+        args: [[null], {
+          mode: 'immediate',
+          transition: {duration: 0},
+          frame: {duration: 0, redraw: false}
+        }],
+        label: 'Pause'
+      }]
+    }],
+   // Finally, add the slider and use `pad` to position it
+   // nicely next to the buttons.
+    sliders: [{
+      pad: {l: 130, t: 55},
+      currentvalue: {
+        visible: true,
+        prefix: 'An_debut:',
+        xanchor: 'right',
+        font: {size: 20, color: '#666'}
+      },
+      steps: sliderSteps
+    }]
+  };
+  
+  // Create the plot:
+  Plotly.plot('myDiv', {
+    data: traces,
+    layout: layout,
+   config: {showSendToCloud:true},
+    frames: frames,
+  });
+});
+    </script>
+  </body>
